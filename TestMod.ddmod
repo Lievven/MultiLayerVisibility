@@ -1,8 +1,8 @@
 {
-	"name": "Test Mod",
-	"unique_id": "Lievven.TestMod",
+	"name": "More Level Visibility",
+	"unique_id": "Lievven.Level_Visibility",
 	"version": "1.0.0",
 	"author": "Lievven",
-	"description": "Just a noob CS student trying out DD modding.",
+	"description": "View any number of levels at the same time.",
 	"dd_version": "1.1.0.0"
 }

@@ -1,9 +1,11 @@
 var script_class = "tool"
 
-
-const DEBUG_MODE = true
+# Set to true to show debug buttons
+const DEBUG_MODE = false
+# Constants holding the names for the meta options
 const LEVEL_VISIBILITY_META = "permanent_level_visibility"
 const LEVEL_ID_META = "level_id"
+const REWIND_ICON_PATH = "icons/rewind_icon.png"
 
 # Id of the last selected level in Global.World
 var previous_level_id: int = 0
@@ -12,6 +14,7 @@ var tree = null
 var current_level_hash: String = ""
 var tool_enabled = false
 var tool_panel = null
+
 
 # Vanilla start function called by Dungeondraft when the mod is first loaded
 func start():
@@ -24,13 +27,12 @@ func start():
     # Debug button that prints a lot of useful information
     # Refresh button that refreshes the level visibility UI
     if DEBUG_MODE:
-        var debug_button = tool_panel.CreateButton("DEBUG", Global.Root + "icons/stolen_tool_image.png")
+        var debug_button = tool_panel.CreateButton("DEBUG", Global.Root + REWIND_ICON_PATH)
         debug_button.connect("pressed", self, "_on_debug_button")
 
-        var refresh_button = tool_panel.CreateButton("Refresh Visibility", Global.Root + "icons/stolen_tool_image.png")
+        var refresh_button = tool_panel.CreateButton("Refresh Visibility", Global.Root + REWIND_ICON_PATH)
         refresh_button.connect("pressed", self, "refresh_visibility_tool_tree")
     
-
     # Create a new UI tree layout
     # The tree is not yet populated as this needs to be done anew every time the levels update
     tree = Tree.new()
@@ -74,7 +76,7 @@ func _on_tree_button_toggled ():
     var level_id = tree_item.get_meta(LEVEL_ID_META)
     Global.World.levels[level_id].set_meta(LEVEL_VISIBILITY_META, tree_item.is_checked(0))
     if level_id != Global.World.CurrentLevelId:
-        go_to_level(level_id, tree_item.is_checked(0))
+        set_level_visible(level_id, tree_item.is_checked(0))
 
 
 # If the level layout has changed, updates the visibility selection tree to match
@@ -85,7 +87,6 @@ func refresh_visibility_tool_tree():
         #print("No Visibility Refresh (%s)" % current_level_hash)
         return
     current_level_hash = new_level_hash
-    
     #print("Refresh Visibility (%s)" % current_level_hash)
     
     # Clears the tree and sets up the root of the tree
@@ -103,8 +104,13 @@ func refresh_visibility_tool_tree():
         new_item.set_selectable(0, false)
         new_item.set_text(0, level.Label)
         new_item.set_meta(LEVEL_ID_META, level.ID)
-        if level.get_meta(LEVEL_VISIBILITY_META):
+        if (
+                level.has_meta(LEVEL_VISIBILITY_META)
+                and level.get_meta(LEVEL_VISIBILITY_META)
+        ):
             new_item.set_checked(0, true)
+            level.visible = true
+    previous_level_id = Global.World.CurrentLevelId
 
 
 # Returns a hash of the level layout.
@@ -118,7 +124,6 @@ func hash_levels():
     for level in Global.World.levels:
         hash_content += str(level.get_instance_id())
         hash_content += str(level.Label)
-        hash_content = hash_content + level.get_instance_id()
     return hash_content
 
 
@@ -128,16 +133,19 @@ func update_old_level_visibility():
     if Global.World.CurrentLevelId == previous_level_id:
         return
     
-    var level_visibility_meta = Global.World.levels[previous_level_id].get_meta(LEVEL_VISIBILITY_META)
-    if level_visibility_meta:
-        go_to_level(previous_level_id)
+    var previous_level = Global.World.levels[previous_level_id]
+    if (
+            previous_level.has_meta(LEVEL_VISIBILITY_META)
+            and previous_level.get_meta(LEVEL_VISIBILITY_META)
+    ):
+        set_level_visible(previous_level_id)
 
     previous_level_id = Global.World.CurrentLevelId
 
 
-# Sets the given level to become visible
-func go_to_level(level_id = 0, is_visible = true):
-    var level = Global.World.GetLevelByID(level_id)
+# Used to set the given level to become visible
+func set_level_visible(level_id = 0, is_visible = true):
+    var level = Global.World.levels[level_id]
     level.visible = is_visible
 
 
