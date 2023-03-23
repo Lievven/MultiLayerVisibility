@@ -1,35 +1,35 @@
 var script_class = "tool"
 
-var tool_enabled = false
-var previous_level_id = 0
-var button = null
-var tool_panel = null
-var refresh_button = null
 
-var current_level_hash = ""
-var level_tree = null
+const DEBUG_MODE = true
+const LEVEL_VISIBILITY_META = "permanent_level_visibility"
+const LEVEL_ID_META = "level_id"
 
-# The tree for the UI and its root
+# Id of the last selected level in Global.World
+var previous_level_id: int = 0
+# The tree for the level visibility UI
 var tree = null
+var current_level_hash: String = ""
+var tool_enabled = false
+var tool_panel = null
 
-
+# Vanilla start function called by Dungeondraft when the mod is first loaded
 func start():
     # Fetch tool panel for level selection.
     tool_panel = Global.Editor.Toolset.GetToolPanel("LevelSettings")
 
-    # Add button for debug purposes. All this one does is display the active level on the button.
-    button = tool_panel.CreateButton("Level ID", Global.Root + "icons/stolen_tool_image.png")
-    button.connect("pressed", self, "_get_active_level")
-
-    # Add button for debug print
-    var debug_button = tool_panel.CreateButton("DEBUG", Global.Root + "icons/stolen_tool_image.png")
-    debug_button.connect("pressed", self, "_on_debug_button")
-
     tool_panel.BeginSection(true)
+
+    # If in DEBUG_MODE, print buttons for:
+    # Debug button that prints a lot of useful information
+    # Refresh button that refreshes the level visibility UI
+    if DEBUG_MODE:
+        var debug_button = tool_panel.CreateButton("DEBUG", Global.Root + "icons/stolen_tool_image.png")
+        debug_button.connect("pressed", self, "_on_debug_button")
+
+        var refresh_button = tool_panel.CreateButton("Refresh Visibility", Global.Root + "icons/stolen_tool_image.png")
+        refresh_button.connect("pressed", self, "refresh_visibility_tool_tree")
     
-    # Add a refresh button for debug purposes. This should clear and refresh the level order.
-    refresh_button = tool_panel.CreateButton("Refresh Visibility", Global.Root + "icons/stolen_tool_image.png")
-    refresh_button.connect("pressed", self, "refresh_visibility_tool_tree")
 
     # Create a new UI tree layout
     # The tree is not yet populated as this needs to be done anew every time the levels update
@@ -42,30 +42,69 @@ func start():
 
     # Connect signals
     tree.connect("item_edited", self, "_on_tree_button_toggled")
-    tool_panel.connect("gui_input", self, "_on_gui_event")
     tool_panel.connect("visibility_changed", self, "_on_tool_visibility_changed")
+
+
+# Vanilla update called by Godot every frame.
+# We only need to refresh the tool layout if the tool is enabled.
+# While we could do this on a timer, I do not think that the performance overhead matters much on this tool.
+# Regardless of whether the tool is active or not, we need to update the visibility of a level after swapping levels.
+func update(delta):
+    if tool_enabled:
+        refresh_visibility_tool_tree()
+    
+    update_old_level_visibility()
 
 
 # Detects whether the tool is active based on its visibility.
 # This is a terrible hack and I deserve to be eaten by a dragon.
 func _on_tool_visibility_changed():
     tool_enabled = tool_panel.visible
-    print("Tool status: %s" % tool_enabled)
+    #print("Tool status: %s" % tool_enabled)
 
 
-# Debug function, very important. Prints whatever stuff I need to know at the moment.
-func _on_debug_button():
-    print("========== DEBUG BUTTON ==========")
-    #print_levels()
-    #print_methods(Global.World)
-    #print_properties(Global.World)
-    #print_signals(Global.World.get_child("Level a"))
-    #Global.World.print_tree_pretty()
-    #tool_panel.Align.print_tree_pretty()
-    #Global.World.print_tree_pretty()
-    #print_methods(Global.World.levels[0])
-    #print("Hash: %s" % hash_levels())
-    #print_properties(tool_panel)
+# Called whenever a check_button on the permanent visibility menu is toggled.
+# Updates the permanent_level_visibility flag of the level associated with that check_button to match
+# Finally updates the corresponding level to match its flag
+func _on_tree_button_toggled ():
+    var tree_item = tree.get_edited()
+    if not tree_item.has_meta(LEVEL_ID_META):
+        return
+
+    var level_id = tree_item.get_meta(LEVEL_ID_META)
+    Global.World.levels[level_id].set_meta(LEVEL_VISIBILITY_META, tree_item.is_checked(0))
+    if level_id != Global.World.CurrentLevelId:
+        go_to_level(level_id, tree_item.is_checked(0))
+
+
+# If the level layout has changed, updates the visibility selection tree to match
+func refresh_visibility_tool_tree():
+    # Only refresh the visibility bar if the level layout actually changed since the last refresh.
+    var new_level_hash = hash_levels()
+    if new_level_hash == current_level_hash:
+        #print("No Visibility Refresh (%s)" % current_level_hash)
+        return
+    current_level_hash = new_level_hash
+    
+    #print("Refresh Visibility (%s)" % current_level_hash)
+    
+    # Clears the tree and sets up the root of the tree
+    # The root also serves as a label for the tree
+    tree.clear()
+    var root = tree.create_item()
+    root.set_text(0, "Permanently Visible Levels")
+    root.set_selectable(0, false)
+    
+    # Adds the individual checkboxes for the visibility selection tree
+    for level in Global.World.levels:
+        var new_item = tree.create_item(root)
+        new_item.set_cell_mode(0, 1)
+        new_item.set_editable(0, true)
+        new_item.set_selectable(0, false)
+        new_item.set_text(0, level.Label)
+        new_item.set_meta(LEVEL_ID_META, level.ID)
+        if level.get_meta(LEVEL_VISIBILITY_META):
+            new_item.set_checked(0, true)
 
 
 # Returns a hash of the level layout.
@@ -83,78 +122,22 @@ func hash_levels():
     return hash_content
 
 
-# Called whenever a check_button on the permanent visibility menu is toggled.
-# Updates the permanent_level_visibility flag of the level associated with the check_button to match
-# Finally updates the corresponding level to match its flag
-func _on_tree_button_toggled ():
-    print("==============BUTTON TOGGLED============")
-    var tree_item = tree.get_edited()
-    if not tree_item.has_meta("level_id"):
-        return
-
-    var level_id = tree_item.get_meta("level_id")
-    print("Meta %s" % level_id)
-    Global.World.levels[level_id].set_meta("permanent_level_visibility", tree_item.is_checked(0))
-    if level_id != Global.World.Currentlevel_id:
-        go_to_level(level_id, tree_item.is_checked(0))
-
-
-# Vanilla update called by Godot every frame.
-# We only need to refresh the tool layout if the tool is enabled.
-# While we could do this on a timer, I do not think that the performance overhead matters much on this tool.
-# Regardless of whether the tool is active or not, we need to update the visibility of a level after swapping levels.
-func update(delta):
-    if tool_enabled:
-        pass
-        #refresh_visibility_tool_tree()
-    
-    update_old_level_visibility()
-
-
-func refresh_visibility_tool_tree():
-    # Only refresh the visibility bar if the level layout actually changed since the last refresh.
-    var new_level_hash = hash_levels()
-    if new_level_hash == current_level_hash:
-        print("No Visibility Refresh (%s)" % current_level_hash)
-        return
-    current_level_hash = new_level_hash
-    
-    print("Refresh Visibility (%s)" % current_level_hash)
-
-    tree.clear()
-    var root = tree.create_item()
-    root.set_text(0, "Permanently Visible Levels")
-    root.set_selectable(0, false)
-
-    for level in Global.World.levels:
-        var new_item = tree.create_item(root)
-        new_item.set_cell_mode(0, 1)
-        new_item.set_editable(0, true)
-        new_item.set_selectable(0, false)
-        new_item.set_text(0, level.Label)
-        new_item.set_meta("level_id", level.ID)
-        if level.get_meta("permanent_level_visibility"):
-            new_item.set_checked(0, true)
-
-
 # If the active level has been changed since the last call,
 # changes the previously selected level's visibility to the one assigned by this mod.
 func update_old_level_visibility():
-    if Global.World.Currentlevel_id == previous_level_id:
+    if Global.World.CurrentLevelId == previous_level_id:
         return
     
-    var level_visibility_meta = Global.World.levels[previous_level_id].get_meta("permanent_level_visibility")
+    var level_visibility_meta = Global.World.levels[previous_level_id].get_meta(LEVEL_VISIBILITY_META)
     if level_visibility_meta:
         go_to_level(previous_level_id)
 
-    previous_level_id = Global.World.Currentlevel_id
-
+    previous_level_id = Global.World.CurrentLevelId
 
 
 # Sets the given level to become visible
 func go_to_level(level_id = 0, is_visible = true):
     var level = Global.World.GetLevelByID(level_id)
-    print("Go to level: %s with visibility: %s" % level % level.visible)
     level.visible = is_visible
 
 
@@ -164,6 +147,21 @@ func go_to_level(level_id = 0, is_visible = true):
 
 
 
+
+# =========================================================
+# ANYTHING BEYOND THIS POINT IS FOR DEBUGGING PURPOSES ONLY
+# =========================================================
+
+
+
+# Debug function, very important. Prints whatever stuff I need to know at the moment.
+func _on_debug_button():
+    print("========== DEBUG BUTTON ==========")
+    print_levels()
+    print_methods(Global.World)
+    print_properties(Global.World)
+    print_signals(Global.World)
+    Global.World.print_tree_pretty()
 
 
 # Debug function, prints out the info for every level
@@ -199,31 +197,3 @@ func print_signals(node):
     var signal_list = node.get_signal_list()
     for sig in signal_list:
         print(sig.name)
-
-
-# Debug function, prints single node with a debug message.
-# Meant for signal connection only
-func _on_event_interaction(node):
-    print("Event Interaction: %s" % node)
-
-
-# Debug function, prints & displays the currently active level.
-func _get_active_level():
-    print("select level id: %s" % Global.World.Currentlevel_id)
-    button.set_text("Level ID: %s" % Global.World.Currentlevel_id)
-
-
-# Debug function, prints info about a node and all its children.
-func check_children(node):
-    for child in node.get_children():
-        check_node(child)
-        print("And children: {")
-        check_children(child)
-        print("}")
-
-
-# Debug function, prints some info about node.
-func check_node(node):
-    print("Name: %s" % node.name)
-    print("Path: %s" % node.get_path())
-    print("With class: %s" % node.get_class())
