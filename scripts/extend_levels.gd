@@ -130,7 +130,8 @@ func hash_levels():
 # If the active level has been changed since the last call,
 # changes the previously selected level's visibility to the one assigned by this mod.
 func update_old_level_visibility():
-    if Global.World.CurrentLevelId == previous_level_id:
+    var current_level_id = Global.World.CurrentLevelId
+    if current_level_id == previous_level_id:
         return
     
     var previous_level = Global.World.levels[previous_level_id]
@@ -139,17 +140,30 @@ func update_old_level_visibility():
             and previous_level.get_meta(LEVEL_VISIBILITY_META)
     ):
         set_level_visible(previous_level_id)
-
-    previous_level_id = Global.World.CurrentLevelId
+    
+    # When DD sets a world visible, it resets the z layer index to 0.
+    # So push it up to the intended value again.
+    set_z_level(current_level_id)
+    previous_level_id = current_level_id
 
 
 # Used to set the given level to become visible
 func set_level_visible(level_id = 0, is_visible = true):
     var level = Global.World.levels[level_id]
     level.visible = is_visible
+    set_z_level(level_id)
 
 
-
+# Changes the z-index of the level.
+# The minimum and maximum allowed by Godot are -4096 and 4096 respectively, so we are limited in what we have available to us.
+# Dungeondraft burns 1500 layers per level, so they were shortened to 1000.
+# One side effect of this is the ground of a higher level being on the same layer as the roofs on the level below.
+# We can also have at most 9 levels active at a time before Godot limits us.
+# Currently I deal with this limit by overflowing back to -4000.
+# This may inconvenience the user, but will have to stay until a smarter solution is found.
+func set_z_level(level_id = 0):
+    var level = Global.World.levels[level_id]
+    level.z_index = -4000 + level_id % 9 * 1000
 
 
 
@@ -174,13 +188,11 @@ func _on_debug_button():
 
 # Debug function, prints out the info for every level
 func print_levels():
-    var i=0
-    var level = Global.World.GetLevelByID(i)
-    while level != null:
-        print("Level: %s" % level)
-        level.print_tree_pretty()
-        i = i+1
-        level = Global.World.GetLevelByID(i)
+    for level in Global.World.levels:
+        print("==== Level %s ====" % level.name)
+        print("Z Index: %s" % level.z_index)
+        print("Z Relative: %s" % level.z_as_relative)
+
 
 
 # Debug function, prints properties of the given node
