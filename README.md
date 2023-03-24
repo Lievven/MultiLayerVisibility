@@ -3,8 +3,13 @@ A small Dungeondraft mod to make more layers visible
 
 Installation.
 1. Download the mod
+<<<<<<< HEAD
 2. Extract the directory into your Dungeondraft mod folder
 2.5. If you do not have a mod folder yet, the Mods tab will let you choose one
+=======
+2. Extract the zip file into your Dungeondraft mod folder
+2.5 If you do not have a mod folder yet, the Mods tab will let you choose one
+>>>>>>> 316de132ea3b29c2144f2e6e00e9cdb47eeb7ae9
 3. Use the mods tab to select the mod
 4. Open the map and start drafting
 
