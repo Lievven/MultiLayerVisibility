@@ -97,19 +97,21 @@ func refresh_visibility_tool_tree():
     root.set_selectable(0, false)
     
     # Adds the individual checkboxes for the visibility selection tree
+    var i = 0;
     for level in Global.World.levels:
         var new_item = tree.create_item(root)
         new_item.set_cell_mode(0, 1)
         new_item.set_editable(0, true)
         new_item.set_selectable(0, false)
         new_item.set_text(0, level.Label)
-        new_item.set_meta(LEVEL_ID_META, level.ID)
+        new_item.set_meta(LEVEL_ID_META, i)
         if (
                 level.has_meta(LEVEL_VISIBILITY_META)
                 and level.get_meta(LEVEL_VISIBILITY_META)
         ):
             new_item.set_checked(0, true)
-            level.visible = true
+            set_level_visible(i)
+        i += 1
     previous_level_id = Global.World.CurrentLevelId
 
 
@@ -163,7 +165,7 @@ func set_level_visible(level_id = 0, is_visible = true):
 # This may inconvenience the user, but will have to stay until a smarter solution is found.
 func set_z_level(level_id = 0):
     var level = Global.World.levels[level_id]
-    level.z_index = -4000 + level_id % 9 * 1000
+    level.z_index = 4000 - level_id % 9 * 1000
 
 
 
